@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+  <meta charset="UTF-8">
+  <title>pig eMAIL - Home</title>
+  <style>
+    body { font-family: Arial, sans-serif; display: flex; height: 100vh; margin: 0; }
+    #sidebar { width: 220px; background: #f1f3f4; padding: 20px; border-right: 1px solid #ddd; }
+    #main { flex: 1; padding: 20px; overflow-y: auto; }
+    .mail-item { border-bottom: 1px solid #eee; padding: 12px 0; cursor: pointer; }
+    .mail-item:hover { background-color: #f8f9fa; }
+    .mail-title { font-weight: bold; }
+    .mail-snippet { color: #666; font-size: 14px; }
+  </style>
+</head>
+<body>
+
+  <div id="sidebar">
+    <h3>pig eMAIL</h3>
+    <button onclick="fetchGmailMessages()" style="width: 100%; padding: 10px; margin-bottom: 10px;">收件匣</button>
+  </div>
+
+  <div id="main">
+    <h2>收件匣</h2>
+    <div id="emailList">載入郵件中...</div>
+  </div>
+
+  <script>
+    // 取得儲存的 Access Token
+    const googleToken = sessionStorage.getItem("google_token");
+
+    window.onload = function() {
+      if (!googleToken) {
+        alert("未登入或 Token 已過期，請重新登入");
+        window.location.href = "https://pig-mail.pages.dev";
+        return;
+      }
+      fetchGmailMessages();
+    };
+
+    // 取得收件匣郵件列表
+    async function fetchGmailMessages() {
+      const listContainer = document.getElementById("emailList");
+      listContainer.innerHTML = "讀取信件中...";
+
+      try {
+        // 1. 取得最新 10 封郵件 ID
+        const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10", {
+          headers: { "Authorization": `Bearer ${googleToken}` }
+        });
+        const data = await res.json();
+        
+        if (!data.messages) {
+          listContainer.innerHTML = "無最新郵件";
+          return;
+        }
+
+        listContainer.innerHTML = "";
+
+        // 2. 逐一取得詳細主旨與內容
+        for (let msg of data.messages) {
+          const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
+            headers: { "Authorization": `Bearer ${googleToken}` }
+          });
+          const detail = await detailRes.json();
+          
+          // 抓取主旨 Header
+          const headers = detail.payload.headers;
+          const subjectObj = headers.find(h => h.name === "Subject");
+          const subject = subjectObj ? subjectObj.value : "無主旨";
+
+          // 渲染至 UI
+          const item = document.createElement("div");
+          item.className = "mail-item";
+          item.innerHTML = `
+            <div class="mail-title">${subject}</div>
+            <div class="mail-snippet">${detail.snippet}</div>
+          `;
+          listContainer.appendChild(item);
+        }
+      } catch (err) {
+        console.error("無法讀取信件", err);
+        listContainer.innerHTML = "讀取郵件失敗，請重新登入授權";
+      }
+    }
+  </script>
+</body>
+</html>
