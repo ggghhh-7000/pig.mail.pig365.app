@@ -2,86 +2,183 @@
 <html lang="zh-TW">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>pig eMAIL - Home</title>
   <style>
-    body { font-family: Arial, sans-serif; display: flex; height: 100vh; margin: 0; }
-    #sidebar { width: 220px; background: #f1f3f4; padding: 20px; border-right: 1px solid #ddd; }
-    #main { flex: 1; padding: 20px; overflow-y: auto; }
-    .mail-item { border-bottom: 1px solid #eee; padding: 12px 0; cursor: pointer; }
-    .mail-item:hover { background-color: #f8f9fa; }
-    .mail-title { font-weight: bold; }
-    .mail-snippet { color: #666; font-size: 14px; }
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; display: flex; height: 100vh; background: #f6f8fc; }
+    #sidebar { width: 240px; background: #ffffff; padding: 20px; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; }
+    #sidebar h2 { margin-top: 0; color: #1f1f1f; font-size: 20px; }
+    .nav-btn { background: #c2e7ff; color: #001d35; border: none; padding: 12px 20px; border-radius: 16px; font-weight: bold; cursor: pointer; text-align: left; margin-bottom: 10px; }
+    .logout-btn { background: transparent; border: 1px solid #747775; padding: 8px 16px; border-radius: 20px; cursor: pointer; margin-top: auto; }
+    #main { flex: 1; padding: 24px; overflow-y: auto; }
+    .mail-card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.1s; }
+    .mail-card:hover { transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .mail-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
+    .mail-sender { font-weight: bold; color: #202124; }
+    .mail-date { font-size: 12px; color: #5f6368; }
+    .mail-subject { font-size: 15px; font-weight: 500; color: #1a73e8; margin-bottom: 4px; }
+    .mail-snippet { font-size: 13px; color: #5f6368; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    #status { padding: 10px; color: #666; }
   </style>
 </head>
 <body>
 
   <div id="sidebar">
-    <h3>pig eMAIL</h3>
-    <button onclick="fetchGmailMessages()" style="width: 100%; padding: 10px; margin-bottom: 10px;">收件匣</button>
+    <h2>pig eMAIL</h2>
+    <button class="nav-btn" onclick="loadEmails()">📥 收件匣</button>
+    <button class="logout-btn" onclick="logout()">登出帳號</button>
   </div>
 
   <div id="main">
-    <h2>收件匣</h2>
-    <div id="emailList">載入郵件中...</div>
+    <h3 id="user-info">載入中...</h3>
+    <div id="status">正在驗證 Token 與讀取郵件...</div>
+    <div id="email-list"></div>
   </div>
 
   <script>
-    // 取得儲存的 Access Token
-    const googleToken = sessionStorage.getItem("google_token");
+    let currentProvider = ""; // 'ms' 或 'google'
+    let accessToken = "";
 
     window.onload = function() {
-      if (!googleToken) {
-        alert("未登入或 Token 已過期，請重新登入");
+      // 1. 解析網址 Hash 後方的 Token (#ms_token=... 或 #google_token=...)
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      
+      if (hashParams.has("ms_token")) {
+        accessToken = hashParams.get("ms_token");
+        currentProvider = "ms";
+        sessionStorage.setItem("ms_token", accessToken);
+        // 清理網址列，避免 Token 顯露
+        window.history.replaceState(null, null, window.location.pathname);
+      } else if (hashParams.has("google_token")) {
+        accessToken = hashParams.get("google_token");
+        currentProvider = "google";
+        sessionStorage.setItem("google_token", accessToken);
+        window.history.replaceState(null, null, window.location.pathname);
+      } else {
+        // 從 Session 讀取歷史登入 Token
+        if (sessionStorage.getItem("ms_token")) {
+          accessToken = sessionStorage.getItem("ms_token");
+          currentProvider = "ms";
+        } else if (sessionStorage.getItem("google_token")) {
+          accessToken = sessionStorage.getItem("google_token");
+          currentProvider = "google";
+        }
+      }
+
+      // 未檢測到 Token，退回首頁
+      if (!accessToken) {
+        alert("未檢測到登入狀態，請重新登入");
         window.location.href = "https://pig-mail.pages.dev";
         return;
       }
-      fetchGmailMessages();
+
+      // 2. 根據來源載入資料
+      if (currentProvider === "ms") {
+        fetchMicrosoftEmails();
+      } else if (currentProvider === "google") {
+        fetchGoogleEmails();
+      }
     };
 
-    // 取得收件匣郵件列表
-    async function fetchGmailMessages() {
-      const listContainer = document.getElementById("emailList");
-      listContainer.innerHTML = "讀取信件中...";
-
+    // --- 讀取 Microsoft Graph 郵件清單 ---
+    async function fetchMicrosoftEmails() {
+      document.getElementById("status").innerText = "正在讀取 Outlook / Microsoft 郵件...";
       try {
-        // 1. 取得最新 10 封郵件 ID
-        const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10", {
-          headers: { "Authorization": `Bearer ${googleToken}` }
+        // 取得使用者資訊
+        const userRes = await fetch("https://graph.microsoft.com/v1.0/me", {
+          headers: { "Authorization": `Bearer ${accessToken}` }
         });
-        const data = await res.json();
-        
-        if (!data.messages) {
-          listContainer.innerHTML = "無最新郵件";
+        const userData = await userRes.json();
+        document.getElementById("user-info").innerText = `歡迎，${userData.displayName} (${userData.mail || userData.userPrincipalName})`;
+
+        // 取得前 15 封郵件
+        const mailRes = await fetch("https://graph.microsoft.com/v1.0/me/messages?$top=15&$select=subject,sender,receivedDateTime,bodyPreview", {
+          headers: { "Authorization": `Bearer ${accessToken}` }
+        });
+        const mailData = await mailRes.json();
+
+        renderEmails(mailData.value.map(msg => ({
+          sender: msg.sender?.emailAddress?.name || msg.sender?.emailAddress?.address || "未知寄件者",
+          subject: msg.subject || "無主旨",
+          date: new Date(msg.receivedDateTime).toLocaleString(),
+          snippet: msg.bodyPreview
+        })));
+      } catch (err) {
+        console.error("Microsoft 郵件載入失敗:", err);
+        document.getElementById("status").innerText = "郵件載入失敗，Token 可能已過期，請重新登入。";
+      }
+    }
+
+    // --- 讀取 Google Gmail 郵件清單 ---
+    async function fetchGoogleEmails() {
+      document.getElementById("status").innerText = "正在讀取 Gmail 郵件...";
+      try {
+        const listRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10", {
+          headers: { "Authorization": `Bearer ${accessToken}` }
+        });
+        const listData = await listRes.json();
+
+        if (!listData.messages) {
+          document.getElementById("status").innerText = "收件匣無信件";
           return;
         }
 
-        listContainer.innerHTML = "";
-
-        // 2. 逐一取得詳細主旨與內容
-        for (let msg of data.messages) {
-          const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}`, {
-            headers: { "Authorization": `Bearer ${googleToken}` }
+        document.getElementById("user-info").innerText = "Google Gmail 收件匣";
+        
+        let mails = [];
+        for (let item of listData.messages) {
+          const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${item.id}`, {
+            headers: { "Authorization": `Bearer ${accessToken}` }
           });
           const detail = await detailRes.json();
           
-          // 抓取主旨 Header
           const headers = detail.payload.headers;
-          const subjectObj = headers.find(h => h.name === "Subject");
-          const subject = subjectObj ? subjectObj.value : "無主旨";
-
-          // 渲染至 UI
-          const item = document.createElement("div");
-          item.className = "mail-item";
-          item.innerHTML = `
-            <div class="mail-title">${subject}</div>
-            <div class="mail-snippet">${detail.snippet}</div>
-          `;
-          listContainer.appendChild(item);
+          const subject = headers.find(h => h.name === "Subject")?.value || "無主旨";
+          const sender = headers.find(h => h.name === "From")?.value || "未知寄件者";
+          
+          mails.push({
+            sender: sender,
+            subject: subject,
+            date: new Date(parseInt(detail.internalDate)).toLocaleString(),
+            snippet: detail.snippet
+          });
         }
+        renderEmails(mails);
       } catch (err) {
-        console.error("無法讀取信件", err);
-        listContainer.innerHTML = "讀取郵件失敗，請重新登入授權";
+        console.error("Google 郵件載入失敗:", err);
+        document.getElementById("status").innerText = "郵件載入失敗，請重新登入。";
       }
+    }
+
+    // --- 渲染 UI 列表 ---
+    function renderEmails(emailList) {
+      document.getElementById("status").style.display = "none";
+      const container = document.getElementById("email-list");
+      container.innerHTML = "";
+
+      emailList.forEach(mail => {
+        const card = document.createElement("div");
+        card.className = "mail-card";
+        card.innerHTML = `
+          <div class="mail-header">
+            <span class="mail-sender">${escapeHtml(mail.sender)}</span>
+            <span class="mail-date">${mail.date}</span>
+          </div>
+          <div class="mail-subject">${escapeHtml(mail.subject)}</div>
+          <div class="mail-snippet">${escapeHtml(mail.snippet)}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function escapeHtml(text) {
+      return text ? text.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;") : "";
+    }
+
+    function logout() {
+      sessionStorage.clear();
+      window.location.href = "https://pig-mail.pages.dev";
     }
   </script>
 </body>
