@@ -12,8 +12,7 @@
     .nav-btn { background: #c2e7ff; color: #001d35; border: none; padding: 12px 20px; border-radius: 16px; font-weight: bold; cursor: pointer; text-align: left; margin-bottom: 10px; }
     .logout-btn { background: transparent; border: 1px solid #747775; padding: 8px 16px; border-radius: 20px; cursor: pointer; margin-top: auto; }
     #main { flex: 1; padding: 24px; overflow-y: auto; }
-    .mail-card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); cursor: pointer; transition: transform 0.1s; }
-    .mail-card:hover { transform: translateY(-1px); box-shadow: 0 4px 6px rgba(0,0,0,0.1); }
+    .mail-card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
     .mail-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
     .mail-sender { font-weight: bold; color: #202124; }
     .mail-date { font-size: 12px; color: #5f6368; }
@@ -26,7 +25,7 @@
 
   <div id="sidebar">
     <h2>pig eMAIL</h2>
-    <button class="nav-btn" onclick="loadEmails()">📥 收件匣</button>
+    <button class="nav-btn">📥 收件匣</button>
     <button class="logout-btn" onclick="logout()">登出帳號</button>
   </div>
 
@@ -37,18 +36,16 @@
   </div>
 
   <script>
-    let currentProvider = ""; // 'ms' 或 'google'
+    let currentProvider = "";
     let accessToken = "";
 
     window.onload = function() {
-      // 1. 解析網址 Hash 後方的 Token (#ms_token=... 或 #google_token=...)
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
       
       if (hashParams.has("ms_token")) {
         accessToken = hashParams.get("ms_token");
         currentProvider = "ms";
         sessionStorage.setItem("ms_token", accessToken);
-        // 清理網址列，避免 Token 顯露
         window.history.replaceState(null, null, window.location.pathname);
       } else if (hashParams.has("google_token")) {
         accessToken = hashParams.get("google_token");
@@ -56,7 +53,6 @@
         sessionStorage.setItem("google_token", accessToken);
         window.history.replaceState(null, null, window.location.pathname);
       } else {
-        // 從 Session 讀取歷史登入 Token
         if (sessionStorage.getItem("ms_token")) {
           accessToken = sessionStorage.getItem("ms_token");
           currentProvider = "ms";
@@ -66,14 +62,12 @@
         }
       }
 
-      // 未檢測到 Token，退回首頁
       if (!accessToken) {
-        alert("未檢測到登入狀態，請重新登入");
-        window.location.href = "https://pig-mail.pages.dev";
+        alert("未登入，將跳轉至登入頁面");
+        window.location.href = "https://pig-mail-pig365-app.pages.dev";
         return;
       }
 
-      // 2. 根據來源載入資料
       if (currentProvider === "ms") {
         fetchMicrosoftEmails();
       } else if (currentProvider === "google") {
@@ -81,18 +75,15 @@
       }
     };
 
-    // --- 讀取 Microsoft Graph 郵件清單 ---
     async function fetchMicrosoftEmails() {
       document.getElementById("status").innerText = "正在讀取 Outlook / Microsoft 郵件...";
       try {
-        // 取得使用者資訊
         const userRes = await fetch("https://graph.microsoft.com/v1.0/me", {
           headers: { "Authorization": `Bearer ${accessToken}` }
         });
         const userData = await userRes.json();
         document.getElementById("user-info").innerText = `歡迎，${userData.displayName} (${userData.mail || userData.userPrincipalName})`;
 
-        // 取得前 15 封郵件
         const mailRes = await fetch("https://graph.microsoft.com/v1.0/me/messages?$top=15&$select=subject,sender,receivedDateTime,bodyPreview", {
           headers: { "Authorization": `Bearer ${accessToken}` }
         });
@@ -105,12 +96,10 @@
           snippet: msg.bodyPreview
         })));
       } catch (err) {
-        console.error("Microsoft 郵件載入失敗:", err);
-        document.getElementById("status").innerText = "郵件載入失敗，Token 可能已過期，請重新登入。";
+        document.getElementById("status").innerText = "郵件載入失敗，Token 可能已過期。";
       }
     }
 
-    // --- 讀取 Google Gmail 郵件清單 ---
     async function fetchGoogleEmails() {
       document.getElementById("status").innerText = "正在讀取 Gmail 郵件...";
       try {
@@ -132,26 +121,21 @@
             headers: { "Authorization": `Bearer ${accessToken}` }
           });
           const detail = await detailRes.json();
-          
           const headers = detail.payload.headers;
-          const subject = headers.find(h => h.name === "Subject")?.value || "無主旨";
-          const sender = headers.find(h => h.name === "From")?.value || "未知寄件者";
           
           mails.push({
-            sender: sender,
-            subject: subject,
+            sender: headers.find(h => h.name === "From")?.value || "未知寄件者",
+            subject: headers.find(h => h.name === "Subject")?.value || "無主旨",
             date: new Date(parseInt(detail.internalDate)).toLocaleString(),
             snippet: detail.snippet
           });
         }
         renderEmails(mails);
       } catch (err) {
-        console.error("Google 郵件載入失敗:", err);
         document.getElementById("status").innerText = "郵件載入失敗，請重新登入。";
       }
     }
 
-    // --- 渲染 UI 列表 ---
     function renderEmails(emailList) {
       document.getElementById("status").style.display = "none";
       const container = document.getElementById("email-list");
@@ -178,7 +162,7 @@
 
     function logout() {
       sessionStorage.clear();
-      window.location.href = "https://pig-mail.pages.dev";
+      window.location.href = "https://pig-mail-pig365-app.pages.dev";
     }
   </script>
 </body>
