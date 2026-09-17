@@ -3,41 +3,104 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>pig eMAIL - Home</title>
+  <title>pig eMAIL - 主頁</title>
   <style>
     * { box-sizing: border-box; }
-    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; display: flex; height: 100vh; background: #f6f8fc; }
-    #sidebar { width: 240px; background: #ffffff; padding: 20px; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; }
-    #sidebar h2 { margin-top: 0; color: #1f1f1f; font-size: 20px; }
-    .nav-btn { background: #c2e7ff; color: #001d35; border: none; padding: 12px 20px; border-radius: 16px; font-weight: bold; cursor: pointer; text-align: left; margin-bottom: 10px; }
+    body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; display: flex; height: 100vh; background: #f6f8fc; color: #202124; }
+    
+    /* 側邊欄 */
+    #sidebar { width: 260px; background: #ffffff; padding: 20px; border-right: 1px solid #e0e0e0; display: flex; flex-direction: column; flex-shrink: 0; }
+    #sidebar h2 { margin-top: 0; font-size: 20px; color: #1f1f1f; display: flex; align-items: center; gap: 8px; }
+    .compose-btn { background: #c2e7ff; color: #001d35; border: none; padding: 14px 24px; border-radius: 16px; font-size: 15px; font-weight: 600; cursor: pointer; text-align: left; margin-bottom: 20px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
+    .compose-btn:hover { background: #b3d7f5; }
+    .nav-item { padding: 10px 16px; border-radius: 20px; cursor: pointer; font-weight: 500; margin-bottom: 4px; background: #e8def8; color: #1d192b; }
     .logout-btn { background: transparent; border: 1px solid #747775; padding: 8px 16px; border-radius: 20px; cursor: pointer; margin-top: auto; }
-    #main { flex: 1; padding: 24px; overflow-y: auto; }
-    .mail-card { background: #fff; border-radius: 8px; padding: 16px; margin-bottom: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-    .mail-header { display: flex; justify-content: space-between; margin-bottom: 6px; }
-    .mail-sender { font-weight: bold; color: #202124; }
-    .mail-date { font-size: 12px; color: #5f6368; }
-    .mail-subject { font-size: 15px; font-weight: 500; color: #1a73e8; margin-bottom: 4px; }
+
+    /* 主區域 */
+    #main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+    #header { padding: 16px 24px; background: #fff; border-bottom: 1px solid #e0e0e0; display: flex; justify-content: space-between; align-items: center; }
+    #user-info { font-size: 14px; color: #5f6368; font-weight: 500; }
+    
+    /* 內容分割區（列表 + 詳情） */
+    #content-container { flex: 1; display: flex; overflow: hidden; }
+    #email-list { width: 40%; border-right: 1px solid #e0e0e0; overflow-y: auto; background: #fff; }
+    #email-detail { flex: 1; overflow-y: auto; padding: 24px; background: #fff; display: none; }
+    #detail-placeholder { flex: 1; display: flex; align-items: center; justify-content: center; color: #5f6368; font-size: 14px; }
+
+    /* 卡片與內文樣式 */
+    .mail-card { padding: 16px; border-bottom: 1px solid #f1f3f4; cursor: pointer; transition: background 0.15s; }
+    .mail-card:hover { background: #f5f5f5; }
+    .mail-card.active { background: #e8f0fe; }
+    .mail-sender { font-weight: 600; font-size: 14px; margin-bottom: 4px; color: #202124; }
+    .mail-subject { font-size: 14px; font-weight: 500; color: #1a73e8; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .mail-snippet { font-size: 13px; color: #5f6368; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    #status { padding: 10px; color: #666; }
+    .mail-date { font-size: 11px; color: #5f6368; float: right; font-weight: normal; }
+
+    .detail-subject { font-size: 22px; font-weight: 400; margin-bottom: 16px; color: #1f1f1f; }
+    .detail-header { display: flex; justify-content: space-between; border-bottom: 1px solid #eee; padding-bottom: 12px; margin-bottom: 20px; }
+    .detail-body { font-size: 14px; line-height: 1.6; color: #222; }
+
+    /* 寫信 Modal */
+    .modal { display: none; position: fixed; bottom: 0; right: 24px; width: 500px; height: 500px; background: #fff; border-radius: 12px 12px 0 0; box-shadow: 0 4px 16px rgba(0,0,0,0.2); flex-direction: column; border: 1px solid #ccc; z-index: 100; }
+    .modal-header { background: #f2f6fc; padding: 10px 16px; font-weight: 600; border-radius: 12px 12px 0 0; display: flex; justify-content: space-between; align-items: center; }
+    .modal-close { cursor: pointer; border: none; background: transparent; font-size: 16px; }
+    .modal-body { padding: 16px; flex: 1; display: flex; flex-direction: column; gap: 10px; }
+    .modal-body input { border: none; border-bottom: 1px solid #e0e0e0; padding: 8px 0; outline: none; font-size: 14px; }
+    .modal-body textarea { flex: 1; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; outline: none; resize: none; font-size: 14px; font-family: inherit; }
+    .send-btn { background: #1a73e8; color: #fff; border: none; padding: 8px 20px; border-radius: 18px; font-weight: 600; cursor: pointer; align-self: flex-start; }
   </style>
 </head>
 <body>
 
   <div id="sidebar">
-    <h2>pig eMAIL</h2>
-    <button class="nav-btn">📥 收件匣</button>
+    <h2>🐷 pig eMAIL</h2>
+    <button class="compose-btn" onclick="openCompose()">✏️ 撰寫郵件</button>
+    <div class="nav-item">📥 收件匣</div>
     <button class="logout-btn" onclick="logout()">登出帳號</button>
   </div>
 
   <div id="main">
-    <h3 id="user-info">載入中...</h3>
-    <div id="status">正在驗證 Token 與讀取郵件...</div>
-    <div id="email-list"></div>
+    <div id="header">
+      <span id="user-info">驗證中...</span>
+      <button onclick="loadEmails()" style="border:none; background:transparent; cursor:pointer;">🔄 重新整理</button>
+    </div>
+
+    <div id="content-container">
+      <div id="email-list">
+        <div style="padding:20px; text-align:center; color:#666;" id="list-status">載入中...</div>
+      </div>
+      
+      <div id="detail-placeholder">請選取左側郵件以檢視完整內容</div>
+      
+      <div id="email-detail">
+        <div class="detail-subject" id="d-subject"></div>
+        <div class="detail-header">
+          <div><strong id="d-sender"></strong></div>
+          <div id="d-date" style="color:#5f6368; font-size:13px;"></div>
+        </div>
+        <div class="detail-body" id="d-body"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 撰寫郵件 Modal -->
+  <div class="modal" id="compose-modal">
+    <div class="modal-header">
+      <span>新郵件</span>
+      <button class="modal-close" onclick="closeCompose()">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="email" id="send-to" placeholder="收件人">
+      <input type="text" id="send-subject" placeholder="主旨">
+      <textarea id="send-body" placeholder="郵件內容..."></textarea>
+      <button class="send-btn" onclick="sendEmail()">傳送</button>
+    </div>
   </div>
 
   <script>
     let currentProvider = "";
     let accessToken = "";
+    let emailDataStore = [];
 
     window.onload = function() {
       const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -63,97 +126,216 @@
       }
 
       if (!accessToken) {
-        alert("未登入，將跳轉至登入頁面");
+        alert("未檢測到登入狀態，請重新登入");
         window.location.href = "https://pig-mail-pig365-app.pages.dev";
         return;
       }
 
+      loadEmails();
+    };
+
+    function loadEmails() {
+      document.getElementById("list-status").innerText = "讀取中...";
       if (currentProvider === "ms") {
         fetchMicrosoftEmails();
       } else if (currentProvider === "google") {
         fetchGoogleEmails();
       }
-    };
+    }
 
+    // --- Microsoft 讀取 ---
     async function fetchMicrosoftEmails() {
-      document.getElementById("status").innerText = "正在讀取 Outlook / Microsoft 郵件...";
       try {
         const userRes = await fetch("https://graph.microsoft.com/v1.0/me", {
           headers: { "Authorization": `Bearer ${accessToken}` }
         });
         const userData = await userRes.json();
-        document.getElementById("user-info").innerText = `歡迎，${userData.displayName} (${userData.mail || userData.userPrincipalName})`;
+        document.getElementById("user-info").innerText = `${userData.displayName} (${userData.mail || userData.userPrincipalName})`;
 
-        const mailRes = await fetch("https://graph.microsoft.com/v1.0/me/messages?$top=15&$select=subject,sender,receivedDateTime,bodyPreview", {
+        const mailRes = await fetch("https://graph.microsoft.com/v1.0/me/messages?$top=20&$select=id,subject,sender,receivedDateTime,bodyPreview,body", {
           headers: { "Authorization": `Bearer ${accessToken}` }
         });
         const mailData = await mailRes.json();
 
-        renderEmails(mailData.value.map(msg => ({
-          sender: msg.sender?.emailAddress?.name || msg.sender?.emailAddress?.address || "未知寄件者",
+        emailDataStore = mailData.value.map(msg => ({
+          id: msg.id,
+          sender: msg.sender?.emailAddress?.name ? `${msg.sender.emailAddress.name} <${msg.sender.emailAddress.address}>` : msg.sender?.emailAddress?.address,
           subject: msg.subject || "無主旨",
           date: new Date(msg.receivedDateTime).toLocaleString(),
-          snippet: msg.bodyPreview
-        })));
+          snippet: msg.bodyPreview,
+          bodyContent: msg.body.content,
+          isHtml: msg.body.contentType === "html"
+        }));
+
+        renderList();
       } catch (err) {
-        document.getElementById("status").innerText = "郵件載入失敗，Token 可能已過期。";
+        document.getElementById("list-status").innerText = "讀取失敗，Token 可能已過期。";
       }
     }
 
+    // --- Google 讀取 ---
     async function fetchGoogleEmails() {
-      document.getElementById("status").innerText = "正在讀取 Gmail 郵件...";
       try {
-        const listRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=10", {
+        const listRes = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=15", {
           headers: { "Authorization": `Bearer ${accessToken}` }
         });
         const listData = await listRes.json();
 
         if (!listData.messages) {
-          document.getElementById("status").innerText = "收件匣無信件";
+          document.getElementById("list-status").innerText = "收件匣為空";
           return;
         }
 
-        document.getElementById("user-info").innerText = "Google Gmail 收件匣";
+        document.getElementById("user-info").innerText = "Google Gmail 帳號";
         
-        let mails = [];
+        emailDataStore = [];
         for (let item of listData.messages) {
           const detailRes = await fetch(`https://gmail.googleapis.com/gmail/v1/users/me/messages/${item.id}`, {
             headers: { "Authorization": `Bearer ${accessToken}` }
           });
           const detail = await detailRes.json();
           const headers = detail.payload.headers;
-          
-          mails.push({
+
+          let bodyContent = detail.snippet;
+          if (detail.payload.parts) {
+            const htmlPart = detail.payload.parts.find(p => p.mimeType === "text/html");
+            if (htmlPart && htmlPart.body.data) {
+              bodyContent = decodeURIComponent(escape(atob(htmlPart.body.data.replace(/-/g, '+').replace(/_/g, '/'))));
+            }
+          }
+
+          emailDataStore.push({
+            id: detail.id,
             sender: headers.find(h => h.name === "From")?.value || "未知寄件者",
             subject: headers.find(h => h.name === "Subject")?.value || "無主旨",
             date: new Date(parseInt(detail.internalDate)).toLocaleString(),
-            snippet: detail.snippet
+            snippet: detail.snippet,
+            bodyContent: bodyContent,
+            isHtml: true
           });
         }
-        renderEmails(mails);
+        renderList();
       } catch (err) {
-        document.getElementById("status").innerText = "郵件載入失敗，請重新登入。";
+        document.getElementById("list-status").innerText = "載入失敗，請重新登入。";
       }
     }
 
-    function renderEmails(emailList) {
-      document.getElementById("status").style.display = "none";
+    // --- 渲染清單 ---
+    function renderList() {
       const container = document.getElementById("email-list");
       container.innerHTML = "";
 
-      emailList.forEach(mail => {
-        const card = document.createElement("div");
-        card.className = "mail-card";
-        card.innerHTML = `
-          <div class="mail-header">
-            <span class="mail-sender">${escapeHtml(mail.sender)}</span>
-            <span class="mail-date">${mail.date}</span>
-          </div>
+      if(emailDataStore.length === 0) {
+        container.innerHTML = `<div style="padding:20px; text-align:center;">無信件</div>`;
+        return;
+      }
+
+      emailDataStore.forEach((mail, index) => {
+        const div = document.createElement("div");
+        div.className = "mail-card";
+        div.onclick = () => showDetail(index, div);
+        div.innerHTML = `
+          <div class="mail-sender">${escapeHtml(mail.sender)} <span class="mail-date">${mail.date}</span></div>
           <div class="mail-subject">${escapeHtml(mail.subject)}</div>
           <div class="mail-snippet">${escapeHtml(mail.snippet)}</div>
         `;
-        container.appendChild(card);
+        container.appendChild(div);
       });
+    }
+
+    // --- 檢視完整內容 ---
+    function showDetail(index, element) {
+      document.querySelectorAll(".mail-card").forEach(el => el.classList.remove("active"));
+      element.classList.add("active");
+
+      const mail = emailDataStore[index];
+      document.getElementById("detail-placeholder").style.display = "none";
+      const detailContainer = document.getElementById("email-detail");
+      detailContainer.style.display = "block";
+
+      document.getElementById("d-subject").innerText = mail.subject;
+      document.getElementById("d-sender").innerText = mail.sender;
+      document.getElementById("d-date").innerText = mail.date;
+
+      const bodyElem = document.getElementById("d-body");
+      if (mail.isHtml) {
+        bodyElem.innerHTML = mail.bodyContent;
+      } else {
+        bodyElem.innerText = mail.bodyContent;
+      }
+    }
+
+    // --- 寫信與發送 ---
+    function openCompose() { document.getElementById("compose-modal").style.display = "flex"; }
+    function closeCompose() { document.getElementById("compose-modal").style.display = "none"; }
+
+    async function sendEmail() {
+      const to = document.getElementById("send-to").value;
+      const subject = document.getElementById("send-subject").value;
+      const body = document.getElementById("send-body").value;
+
+      if (!to || !subject) {
+        alert("請填寫收件人與主旨");
+        return;
+      }
+
+      try {
+        if (currentProvider === "ms") {
+          // MS Graph 發信 API
+          const payload = {
+            message: {
+              subject: subject,
+              body: { contentType: "Text", content: body },
+              toRecipients: [{ emailAddress: { address: to } }]
+            }
+          };
+
+          const res = await fetch("https://graph.microsoft.com/v1.0/me/sendMail", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(payload)
+          });
+
+          if (res.ok) alert("郵件已成功寄出！");
+          else alert("寄信失敗，請重試");
+
+        } else if (currentProvider === "google") {
+          // Gmail 發信 API (RFC 2822 格式)
+          const email = [
+            `To: ${to}`,
+            `Subject: =?utf-8?B?${btoa(unescape(encodeURIComponent(subject)))}?=`,
+            'Content-Type: text/plain; charset=utf-8',
+            '',
+            body
+          ].join('\r\n');
+
+          const base64Encoded = btoa(unescape(encodeURIComponent(email)))
+            .replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+          const res = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/messages/send", {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${accessToken}`,
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({ raw: base64Encoded })
+          });
+
+          if (res.ok) alert("郵件已成功寄出！");
+          else alert("寄信失敗，請重試");
+        }
+
+        closeCompose();
+        document.getElementById("send-to").value = "";
+        document.getElementById("send-subject").value = "";
+        document.getElementById("send-body").value = "";
+      } catch (err) {
+        console.error("發送失敗：", err);
+        alert("寄信發生錯誤");
+      }
     }
 
     function escapeHtml(text) {
